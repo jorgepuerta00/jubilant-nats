@@ -22,7 +22,7 @@ describe("NatsTransportStrategy", () => {
         jetstreamManager: () => Promise.resolve(jetstreamManager),
       });
 
-      const createStreams = jest.spyOn(strategy, "createStreams").mockImplementation(() => {});;
+      const createStreams = jest.spyOn(strategy, "createStreams").mockImplementation(async () => {});;
       const handleStatusUpdatesSpy = jest.spyOn(strategy, "handleStatusUpdates");
       const subscribeToEventPatternsSpy = jest.spyOn(strategy, "subscribeToEventPatterns");
       const subscribeToMessagePatternsSpy = jest.spyOn(strategy, "subscribeToMessagePatterns");
