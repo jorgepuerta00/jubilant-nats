@@ -4,7 +4,7 @@ import { Codec, ConnectionOptions, JetStreamClient, JetStreamManager, JsMsg, JSO
 import { NatsTransportStrategyOptions } from "./interfaces/nats-transport-strategy-options.interface";
 import { NatsContext } from "./nats.context";
 import { NACK, TERM } from "./nats.constants";
-import { NatsMultiStreamConfig } from "./interfaces/nats-stream-config.interface";
+import { NatsMultiStreamConfig, NatsStreamConfig } from "./interfaces/nats-stream-config.interface";
 
 export class NatsTransportStrategy extends Server implements CustomTransportStrategy {
   protected readonly codec: Codec<unknown>;
@@ -33,8 +33,12 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
     this.jetstreamManager = await this.createJetStreamManager(this.connection);
 
     this.handleStatusUpdates(this.connection);
-    await this.createStreams(this.options.streams, this.jetstreamManager);
+
+    await this.healthStreamsChecker(this.options.streams, this.jetstreamManager);
+    this.logger.log(`Streams are ready`);
+
     await this.subscribeToEventPatterns(this.jetstreamClient);
+
     this.subscribeToMessagePatterns(this.connection);
 
     this.logger.log(`Connected to ${this.connection.getServer()}`);
@@ -77,6 +81,7 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
    * @param {ConnectionOptions} options connection options to establish communication to nats @see ConnectionOptions
    * @returns {Promise<NatsConnection>} returns valid nats connection
    */
+  /* istanbul ignore next */
   createNatsConnection(options: ConnectionOptions = {}): Promise<NatsConnection> {
     return connect(options);
   }
@@ -99,6 +104,7 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
     } catch (error) {
       if (error === NACK) return message.nak();
       if (error === TERM) return message.term();
+      /* istanbul ignore next */
       throw error;
     }
   }
@@ -129,10 +135,16 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
       const message = `(${status.type}): ${data}`;
 
       switch (status.type) {
-        case "pingTimer":
-        case "reconnecting":
-        case "staleConnection":
-          this.logger.debug(message);
+        case "update":
+          this.logger.verbose(message);
+          break;
+
+        case "ldm":
+          this.logger.warn(message);
+          break;
+
+        case "reconnect":
+          this.logger.log(message);
           break;
 
         case "disconnect":
@@ -140,16 +152,10 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
           this.logger.error(message);
           break;
 
-        case "reconnect":
-          this.logger.log(message);
-          break;
-
-        case "ldm":
-          this.logger.warn(message);
-          break;
-
-        case "update":
-          this.logger.verbose(message);
+        case "pingTimer":
+        case "reconnecting":
+        case "staleConnection":
+          this.logger.debug(message);
           break;
       }
     }
@@ -166,10 +172,7 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
 
     for (const [pattern, handler] of eventHandlers) {
       const consumerOptions = consumerOpts();
-
-      if (this.options.consumer) {
-        this.options.consumer(consumerOptions);
-      }
+      if (this.options.consumer) this.options.consumer(consumerOptions);
 
       consumerOptions.callback((error, message) => {
         if (error) {
@@ -221,16 +224,36 @@ export class NatsTransportStrategy extends Server implements CustomTransportStra
    * @param streams streams basic information @see NatsMultiStreamConfig
    * @param jetstreamManager jetstream manager instance @see JetStreamManager
    */
-  async createStreams(streams: NatsMultiStreamConfig, jetstreamManager: JetStreamManager): Promise<void> {
-    streams.forEach(async (stream) => {
+  async healthStreamsChecker(streams: NatsMultiStreamConfig, jetstreamManager: JetStreamManager): Promise<void> {
+    
+    if(!streams) return Promise.resolve();
+
+    const tasks = [];
+    for (const stream of streams) {
+      tasks.push(() => this.handleStream(stream, jetstreamManager));
+    }
+    this.logger.verbose(`Checked ${tasks.length} streams`);
+
+    const promises = tasks.map(task => task());
+    await Promise.all(promises);
+  }
+
+  /**
+   * check if exist stream
+   * @param stream streams basic information @see NatsStreamConfig
+   * @param jetstreamManager jetstream manager instance @see JetStreamManager
+   */
+  async handleStream(stream: NatsStreamConfig, jetstreamManager: JetStreamManager): Promise<boolean> {
+    return new Promise(async resolve => {
       try {
         await jetstreamManager.streams.info(stream.name);
         this.logger.debug(`Stream [${stream.name}] already exist`);
-      } catch (error) {
+      } catch {
         await jetstreamManager.streams.add(stream);
         this.logger.verbose(`Stream [${stream.name}] has been created`);
       }
+      resolve(true);
     });
-    await Promise.resolve();
   }
+
 }

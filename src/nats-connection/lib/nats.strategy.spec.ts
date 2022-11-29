@@ -4,15 +4,15 @@ import { NatsTransportStrategy } from "./nats.strategy";
 import { NACK, TERM } from "./nats.constants";
 import { createMock } from "@golevelup/ts-jest";
 
-describe("NatsTransportStrategy", () => {
+describe("GIVEN a NatsTransportStrategy's instance", () => {
   let strategy: NatsTransportStrategy;
 
   beforeEach(() => {
     strategy = new NatsTransportStrategy();
   });
 
-  describe("listen", () => {
-    it("bootstraps correctly", (complete) => {
+  describe("WHEN listen", () => {
+    it("THEN bootstraps correctly", (complete) => {
       const jetstreamClient = createMock<JetStreamClient>();
       const jetstreamManager = createMock<JetStreamManager>();
 
@@ -22,7 +22,7 @@ describe("NatsTransportStrategy", () => {
         jetstreamManager: () => Promise.resolve(jetstreamManager),
       });
 
-      const createStreams = jest.spyOn(strategy, "createStreams").mockImplementation(async () => {});;
+      const healthStreamsCheckerSpy = jest.spyOn(strategy, "healthStreamsChecker");
       const handleStatusUpdatesSpy = jest.spyOn(strategy, "handleStatusUpdates");
       const subscribeToEventPatternsSpy = jest.spyOn(strategy, "subscribeToEventPatterns");
       const subscribeToMessagePatternsSpy = jest.spyOn(strategy, "subscribeToMessagePatterns");
@@ -40,8 +40,7 @@ describe("NatsTransportStrategy", () => {
         expect(subscribeToEventPatternsSpy).toBeCalledWith(strategy["jetstreamClient"]);
         expect(subscribeToMessagePatternsSpy).toBeCalledTimes(1);
         expect(subscribeToMessagePatternsSpy).toBeCalledWith(strategy["connection"]);
-        expect(createStreams).toBeCalledTimes(1);
-        expect(loggerSpy).toBeCalledTimes(1);
+        expect(healthStreamsCheckerSpy).toBeCalledTimes(1);
         expect(loggerSpy).toBeCalledWith("Connected to nats://test:4222");
 
         complete();
@@ -49,8 +48,8 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("close", () => {
-    it("should drain and cleanup", async () => {
+  describe("WHEN close", () => {
+    it("THEN drain and cleanup must be called", async () => {
       const connection = createMock<NatsConnection>({
         drain: jest.fn()
       });
@@ -69,8 +68,8 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("createJetStreamClient", () => {
-    it("returns a jetstream client", () => {
+  describe("WHEN create a JetStreamClient", () => {
+    it("THEN returns a jetstream client", () => {
       const jsMock = createMock<JetStreamClient>();
 
       const connection = createMock<NatsConnection>({
@@ -84,8 +83,8 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("createJetStreamManager", () => {
-    it("returns a jetstream manager", async () => {
+  describe("WHEN create a JetStreamManager", () => {
+    it("THEN returns a jetstream manager", async () => {
       const jsmMock = createMock<JetStreamManager>();
 
       const client = createMock<NatsConnection>({
@@ -99,7 +98,7 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("handleJetStreamMessage", () => {
+  describe("WHEN handle a JetStream message", () => {
     let strategy: NatsTransportStrategy;
 
     beforeAll(() => {
@@ -108,7 +107,7 @@ describe("NatsTransportStrategy", () => {
       });
     });
 
-    it("should ack", async () => {
+    it("THEN ack", async () => {
       const message = createMock<JsMsg>({
         data: new Uint8Array([104, 101, 108, 108, 111])
       });
@@ -125,7 +124,7 @@ describe("NatsTransportStrategy", () => {
       expect(message.working).toBeCalledTimes(1);
     });
 
-    it("should nack", async () => {
+    it("THEN nack", async () => {
       const message = createMock<JsMsg>({
         data: new Uint8Array([104, 101, 108, 108, 111])
       });
@@ -142,7 +141,7 @@ describe("NatsTransportStrategy", () => {
       expect(message.working).toBeCalledTimes(1);
     });
 
-    it("should term", async () => {
+    it("THEN term", async () => {
       const message = createMock<JsMsg>({
         data: new Uint8Array([104, 101, 108, 108, 111])
       });
@@ -160,7 +159,7 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("handleNatsMessage", () => {
+  describe("WHEN handle Nats message", () => {
     const codec = JSONCodec();
 
     let strategy: NatsTransportStrategy;
@@ -171,7 +170,7 @@ describe("NatsTransportStrategy", () => {
       });
     });
 
-    it("responds to messages", async () => {
+    it("THEN responds to messages", async () => {
       const request = { hello: "world" };
       const response = { goodbye: "world" };
 
@@ -202,8 +201,8 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("handleStatusUpdates", () => {
-    it("should log debug events", async () => {
+  describe("WHEN handle status updates", () => {
+    it("THEN log debug events", async () => {
       const connection = {
         status() {
           return {
@@ -226,7 +225,7 @@ describe("NatsTransportStrategy", () => {
       expect(loggerSpy).toBeCalledWith(`(staleConnection): 1`);
     });
 
-    it("should log 'error' events", async () => {
+    it("THEN log 'error' events", async () => {
       const connection = {
         status() {
           return {
@@ -247,7 +246,7 @@ describe("NatsTransportStrategy", () => {
       expect(loggerSpy).toBeCalledWith(`(error): 1`);
     });
 
-    it("should log 'reconnect' events", async () => {
+    it("THEN log 'reconnect' events", async () => {
       const connection = {
         status() {
           return {
@@ -266,7 +265,7 @@ describe("NatsTransportStrategy", () => {
       expect(loggerSpy).toBeCalledWith(`(reconnect): 1`);
     });
 
-    it("should log 'ldm' events", async () => {
+    it("THEN log 'ldm' events", async () => {
       const connection = {
         status() {
           return {
@@ -285,7 +284,7 @@ describe("NatsTransportStrategy", () => {
       expect(loggerSpy).toBeCalledWith(`(ldm): 1`);
     });
 
-    it("should log 'update' events", async () => {
+    it("THEN log 'update' events", async () => {
       const connection = {
         status() {
           return {
@@ -307,8 +306,8 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("subscribeToEventPatterns", () => {
-    it("should only subscribe to event patterns with default options", async () => {
+  describe("WHEN subscribe to event patterns", () => {
+    it("AND use default options THEN only subscribe to event patterns", async () => {
       strategy.addHandler("my.first.event", jest.fn(), true);
       strategy.addHandler("my.second.event", jest.fn(), true);
       strategy.addHandler("my.first.message", jest.fn(), false);
@@ -331,15 +330,15 @@ describe("NatsTransportStrategy", () => {
     });
   });
 
-  describe("subscribeToMessagePatterns", () => {
-    it("should only subscribe to message patterns with default options", async () => {
+  describe("WHEN subscribe to message patterns", () => {
+    it("AND use default options THEN only subscribe to message patterns", async () => {
       strategy.addHandler("my.first.message", jest.fn(), false);
       strategy.addHandler("my.second.message", jest.fn(), false);
       strategy.addHandler("my.first.event", jest.fn(), true);
 
       const client = createMock<NatsConnection>();
 
-      await strategy.subscribeToMessagePatterns(client);
+      strategy.subscribeToMessagePatterns(client);
 
       const defaultConsumerOptions = expect.objectContaining({
         queue: undefined
@@ -351,4 +350,63 @@ describe("NatsTransportStrategy", () => {
       expect(client.subscribe).not.toBeCalledWith("my.first.event");
     });
   });
+
+  describe("WHEN boostrap streams", () => {
+    it("AND use streams options THEN should get stream info", async () => {
+
+      const jsmMock = createMock<JetStreamManager>({
+        streams: {
+          info: jest.fn()
+        }
+      });
+
+      const loggerSpy = jest.spyOn(strategy["logger"], "debug");
+
+      const client = createMock<NatsConnection>({
+        jetstreamManager: () => Promise.resolve(jsmMock)
+      });
+
+      const jetstreamManager = await strategy.createJetStreamManager(client);
+
+      const streams = [
+        {
+          name: 'stream',
+          subjects: ['test-subject.*'],
+        }
+      ]
+
+      await strategy.healthStreamsChecker(streams, jetstreamManager);
+
+      expect(loggerSpy).toBeCalledWith("Stream [stream] already exist");
+    });
+
+    it("AND use streams options THEN should add new stream", async () => {
+
+      const jsmMock = createMock<JetStreamManager>({
+        streams: {
+          add: jest.fn()
+        }
+      });
+
+      const loggerSpy = jest.spyOn(strategy["logger"], "verbose");
+
+      const client = createMock<NatsConnection>({
+        jetstreamManager: () => Promise.resolve(jsmMock)
+      });
+
+      const jetstreamManager = await strategy.createJetStreamManager(client);
+
+      const streams = [
+        {
+          name: 'stream',
+          subjects: ['test-subject.*'],
+        }
+      ]
+
+      await strategy.healthStreamsChecker(streams, jetstreamManager);
+
+      expect(loggerSpy).toBeCalledWith("Stream [stream] has been created");
+    });
+  });
+  
 });
